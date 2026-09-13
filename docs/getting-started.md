@@ -6,11 +6,10 @@ Run your own **Telegram Shop Bot** with one guided command.
 
 ### Requirements
 
-- [Go 1.24+](https://go.dev/dl/)
 - A bot token from [@BotFather](https://t.me/BotFather)
 - Your numeric Telegram user ID
 
-Redis is optional. If it is unavailable, the bot uses its in-memory state store.
+Prebuilt releases need no Go, Make, or Docker. Building from source requires [Go 1.24+](https://go.dev/dl/), Git, and Make. Redis is optional; if it is unavailable, the bot uses its in-memory state store.
 
 ### 1. Create the bot
 
@@ -20,6 +19,22 @@ Redis is optional. If it is unavailable, the bot uses its in-memory state store.
 4. Optional but recommended for sharing products in any chat: `/setinline` → select the bot → set a placeholder such as `Search products`.
 
 ### 2. Configure, verify, and run
+
+Download a release for your system from [GitHub Releases](https://github.com/JumpCodeFrog/telegram-shop-bot/releases). Both Windows and Linux builds offer `amd64` for Intel/AMD processors and `arm64` for ARM processors. Windows archives are available from v3.0.1.
+
+**Windows:** download the matching Windows ZIP and extract the entire archive, including `locales`. Open PowerShell in the extracted directory containing `telegram-shop-bot.exe`:
+
+```powershell
+.\telegram-shop-bot.exe quickstart
+```
+
+**Linux (`amd64` or `arm64`):** extract the matching `.tar.gz` archive, keep `locales` beside the executable, and open a terminal in the extracted directory:
+
+```bash
+./telegram-shop-bot quickstart
+```
+
+**From source:**
 
 ```bash
 git clone https://github.com/JumpCodeFrog/telegram-shop-bot.git
@@ -40,7 +55,7 @@ It then performs a read-only Telegram `getMe` check, derives `BOT_USERNAME`, cre
 
 Open `https://t.me/<your_bot_username>` and send `/start`.
 
-Useful commands:
+Stop the bot with `Ctrl+C`. For later starts and checks, use the binary commands below. From a source checkout, the Make equivalents are:
 
 ```bash
 make doctor   # configuration, SQLite, Redis, Telegram, webhook status
@@ -50,16 +65,30 @@ make seed     # optional demo products; never run automatically
 
 ## Direct binary commands
 
-Release binaries expose the same workflow without Make:
+Run commands from the extracted directory so the bot can find `.env` and `locales`.
+
+**Windows PowerShell:**
+
+```powershell
+.\telegram-shop-bot.exe doctor   # configuration and service checks
+.\telegram-shop-bot.exe version  # installed version
+.\telegram-shop-bot.exe run      # start an already configured shop
+```
+
+**Linux:**
 
 ```bash
-telegram-shop-bot quickstart
-# Or run each stage separately:
-telegram-shop-bot init
-telegram-shop-bot doctor
-telegram-shop-bot run
-telegram-shop-bot reconcile-stars  # read-only aggregate Stars ledger check
-telegram-shop-bot payment-review help
+./telegram-shop-bot init       # first-time configuration only
+./telegram-shop-bot doctor
+./telegram-shop-bot version
+./telegram-shop-bot run
+```
+
+For payment inspection on Linux (on Windows, use `.\telegram-shop-bot.exe` with the same arguments):
+
+```bash
+./telegram-shop-bot reconcile-stars  # read-only aggregate Stars ledger check
+./telegram-shop-bot payment-review help
 ```
 
 `telegram-shop-bot` without arguments remains an alias for `run`.
@@ -94,7 +123,7 @@ Stop it with `docker compose down`.
    TELEGRAM_WEBHOOK_SECRET=<random secret>
    ```
 
-3. Run `telegram-shop-bot doctor` before starting.
+3. Run `./telegram-shop-bot doctor` on Linux or `.\telegram-shop-bot.exe doctor` on Windows before starting.
 4. Start the service and verify `/health` and `/metrics`.
 
 `WEBHOOK_URL` is the public base URL. Telegram posts to `<WEBHOOK_URL>/telegram-webhook`; CryptoBot, when enabled, uses `<WEBHOOK_URL>/cryptobot-webhook`.

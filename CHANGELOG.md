@@ -8,6 +8,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [3.0.1] — 2026-09-13
 
+### Added
+
+- **Windows release downloads** — native `amd64` and `arm64` executables packaged as ZIP archives alongside the existing Linux archives. Downloads include translations, example settings, and setup documentation; the guided setup runs directly from PowerShell without Go, Make, or Docker.
+
 ### Fixed
 
 - **Checkout totals after a promo code** — the payment summary, Stars and USDT buttons, and new-order admin notification now display the saved order totals, including the discount and Stars rounding. Previously they showed the original cart price even though the invoice charged the discounted amount.

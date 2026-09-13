@@ -83,7 +83,31 @@ A full-featured e-commerce bot for Telegram — catalog, cart, Telegram Stars & 
 > Recovery stays preview-first and explicit; see the
 > [payment operations runbook](docs/payment-operations.md).
 
-Get a token from [@BotFather](https://t.me/BotFather), then run:
+Get a token from [@BotFather](https://t.me/BotFather), then choose a release binary or build from source.
+
+#### Download a binary (Windows or Linux)
+
+Download the archive for your system from [GitHub Releases](https://github.com/JumpCodeFrog/telegram-shop-bot/releases): Windows (`.zip`, available from v3.0.1) or Linux (`.tar.gz`). Choose `amd64` for Intel/AMD processors or `arm64` for ARM processors. Prebuilt binaries need no Go, Make, or Docker.
+
+**Windows:** extract the entire ZIP, including the `locales` folder. Open PowerShell in the extracted directory containing `telegram-shop-bot.exe`, then run:
+
+```powershell
+.\telegram-shop-bot.exe quickstart
+```
+
+After stopping the bot with `Ctrl+C`, use these commands in the same directory:
+
+```powershell
+.\telegram-shop-bot.exe doctor   # check configuration and services
+.\telegram-shop-bot.exe version  # show the installed version
+.\telegram-shop-bot.exe run      # start without the wizard
+```
+
+**Linux:** extract the entire archive, keep `locales` beside the executable, open a terminal in that directory, and run `./telegram-shop-bot quickstart`. Later, use `./telegram-shop-bot doctor`, `./telegram-shop-bot version`, or `./telegram-shop-bot run`.
+
+#### Build from source
+
+Requires [Go 1.24+](https://go.dev/dl/), Git, and Make:
 
 ```bash
 git clone https://github.com/JumpCodeFrog/telegram-shop-bot.git && cd telegram-shop-bot
@@ -102,7 +126,7 @@ make run        # start without the wizard
 make payment-review PROVIDER=stars # redacted local review inbox
 ```
 
-**Requirements:** [Go 1.24+](https://go.dev/dl/) and a bot token. Redis is optional; without it the bot uses its in-memory fallback.
+Redis is optional; without it the bot uses its in-memory fallback. See [Getting Started](docs/getting-started.md) for more binary commands.
 
 #### Docker Compose
 
@@ -126,7 +150,7 @@ docker compose logs -f bot
 2. Send `/newbot`
 3. Choose a name and username
 4. Copy the token: `1234567890:ABCdefGHIjklMNOpqrsTUVwxyz`
-5. Paste it when `make quickstart` asks (or set `BOT_TOKEN` in `.env` for Docker)
+5. Paste it when the `quickstart` wizard asks (or set `BOT_TOKEN` in `.env` for Docker)
 
 ---
 

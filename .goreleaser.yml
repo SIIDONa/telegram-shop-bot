@@ -14,6 +14,7 @@ builds:
       - CGO_ENABLED=0
     goos:
       - linux
+      - windows
     goarch:
       - amd64
       - arm64
@@ -26,11 +27,15 @@ builds:
 archives:
   - id: default
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
     files:
       - .env.example
       - locales/**
       - README.md
-      - docs/readme/**
+      - docs/**
+      - CONTRIBUTING.md
       - CHANGELOG.md
       - LICENSE
 
@@ -53,6 +58,8 @@ dockers:
   - image_templates:
       - "ghcr.io/jumpcodefrog/telegram-shop-bot:{{ .Tag }}"
       - "ghcr.io/jumpcodefrog/telegram-shop-bot:latest"
+    goos: linux
+    goarch: amd64
     dockerfile: Dockerfile.release
     extra_files:
       - locales/
@@ -77,10 +84,23 @@ release:
 
     ## Quick Start
 
+    Download the archive for your operating system and processor: `amd64` for
+    Intel/AMD PCs, or `arm64` for ARM devices. Extract the entire archive and
+    open a terminal in that folder; keep `locales/` next to the executable.
+    Go, Make, and Docker are not required for the downloaded binary.
+
+    Windows (PowerShell):
+
+    ```powershell
+    .\telegram-shop-bot.exe quickstart
+    ```
+
+    Linux:
+
     ```bash
     ./telegram-shop-bot quickstart
     ```
 
     The guided setup asks for the BotFather token and your Telegram user ID,
-    validates them, writes a private `.env`, runs diagnostics, and starts the shop.
+    validates them, creates `.env`, runs diagnostics, and starts the shop.
     See [Getting Started](https://github.com/JumpCodeFrog/telegram-shop-bot/blob/main/docs/getting-started.md) for source and Docker paths.

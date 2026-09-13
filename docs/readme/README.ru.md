@@ -63,7 +63,31 @@
 > показывает редактированный inbox. Любая запись требует preview,
 > `--apply` и точный `--confirm-order`. Команды: [payment operations](../payment-operations.md).
 
-Получи токен у [@BotFather](https://t.me/BotFather), затем выполни:
+Получи токен у [@BotFather](https://t.me/BotFather), затем выбери готовую сборку или запуск из исходников.
+
+#### Готовая сборка для Windows или Linux
+
+Скачай архив для своей системы в [GitHub Releases](https://github.com/JumpCodeFrog/telegram-shop-bot/releases): Windows (`.zip`, начиная с v3.0.1) или Linux (`.tar.gz`). Выбирай `amd64` для процессоров Intel/AMD или `arm64` для ARM. Для готовой сборки Go, Make и Docker не нужны.
+
+**Windows:** распакуй ZIP целиком, включая папку `locales`. Открой PowerShell в распакованной папке с `telegram-shop-bot.exe` и выполни:
+
+```powershell
+.\telegram-shop-bot.exe quickstart
+```
+
+После остановки бота через `Ctrl+C` в той же папке доступны команды:
+
+```powershell
+.\telegram-shop-bot.exe doctor   # проверка настроек и сервисов
+.\telegram-shop-bot.exe version  # установленная версия
+.\telegram-shop-bot.exe run      # запуск без мастера
+```
+
+**Linux:** распакуй архив целиком, сохрани `locales` рядом с исполняемым файлом, открой терминал в этой папке и выполни `./telegram-shop-bot quickstart`. Для следующих запусков используй `./telegram-shop-bot run`, для проверки — `./telegram-shop-bot doctor`, для версии — `./telegram-shop-bot version`.
+
+#### Запуск из исходников
+
+Нужны [Go 1.24+](https://go.dev/dl/), Git и Make:
 
 ```bash
 git clone https://github.com/JumpCodeFrog/telegram-shop-bot.git && cd telegram-shop-bot
@@ -81,7 +105,7 @@ make doctor     # понятный отчёт по настройке
 make run        # запуск без мастера
 ```
 
-**Требования:** [Go 1.24+](https://go.dev/dl/) и токен бота. Redis необязателен: без него бот использует in-memory fallback.
+Redis необязателен: без него бот использует хранилище в памяти. Дополнительные команды готовой сборки — в [Getting Started](../getting-started.md).
 
 #### Docker Compose
 
@@ -105,7 +129,7 @@ docker compose logs -f bot
 2. Напиши `/newbot`
 3. Придумай имя и username для бота
 4. Скопируй токен: `1234567890:ABCdefGHIjklMNOpqrsTUVwxyz`
-5. Вставь его по запросу `make quickstart` (или задай `BOT_TOKEN` в `.env` для Docker)
+5. Вставь его по запросу мастера `quickstart` (или задай `BOT_TOKEN` в `.env` для Docker)
 
 ---
 
