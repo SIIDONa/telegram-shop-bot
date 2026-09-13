@@ -6,6 +6,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.0.1] — 2026-09-13
+
+### Fixed
+
+- **Checkout totals after a promo code** — the payment summary, Stars and USDT buttons, and new-order admin notification now display the saved order totals, including the discount and Stars rounding. Previously they showed the original cart price even though the invoice charged the discounted amount.
+- **Payment operations on Windows** — `reconcile-stars` and `payment-review` now open existing SQLite databases using a correctly formed file URI. Windows drive letters previously produced an invalid URI and misleading database errors, including "out of memory". Read-only access and the refusal to create missing databases are preserved.
+- **Payment settlement under concurrent writes** — writable SQLite transactions now reserve the writer before reading order state, allowing the configured busy timeout to wait for a competing writer. Previously a read-to-write upgrade could fail immediately and exhaust settlement retries during brief contention.
+
+### Tests
+
+- Added regression coverage for discounted checkout totals and existing database paths containing spaces, Unicode, `#`, and `%`.
+- Added a controlled concurrent-writer regression that checks payment settlement, a single captured payment, and a single stock decrement after the competing writer finishes.
+- The CI test job now runs on both Linux and Windows. Setup tests check Unix file permissions only on platforms that support them while retaining file and directory checks everywhere.
+
 ## [3.0.0] — 2026-08-27
 
 ### Added

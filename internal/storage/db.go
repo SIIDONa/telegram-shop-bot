@@ -117,18 +117,16 @@ func dsn(dbPath string) string {
 	if strings.Contains(dbPath, "?") {
 		sep = "&"
 	}
-	return dbPath + sep + "_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)"
+	// Reserve the writer before reading state so a later write does not
+	// fail while upgrading a deferred transaction's stale WAL snapshot.
+	return dbPath + sep + "_txlock=immediate&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)"
 }
 
 func readOnlyDSN(dbPath string) string {
 	// modernc/sqlite only passes URI mode flags to sqlite3_open_v2 when the
 	// DSN begins with file:. Encode the filesystem path so spaces, #, ?, and
 	// non-ASCII bytes cannot become URI syntax.
-	abs, err := filepath.Abs(dbPath)
-	if err != nil {
-		abs = dbPath
-	}
-	u := &url.URL{Scheme: "file", Path: filepath.ToSlash(abs)}
+	u := databaseFileURL(dbPath)
 	query := u.Query()
 	query.Set("mode", "ro")
 	query.Add("_pragma", "query_only(1)")
@@ -139,17 +137,29 @@ func readOnlyDSN(dbPath string) string {
 }
 
 func existingReadWriteDSN(dbPath string) string {
-	abs, err := filepath.Abs(dbPath)
-	if err != nil {
-		abs = dbPath
-	}
-	u := &url.URL{Scheme: "file", Path: filepath.ToSlash(abs)}
+	u := databaseFileURL(dbPath)
 	query := u.Query()
 	query.Set("mode", "rw")
+	query.Set("_txlock", "immediate")
 	query.Add("_pragma", "foreign_keys(1)")
 	query.Add("_pragma", "busy_timeout(5000)")
 	u.RawQuery = query.Encode()
 	return u.String()
+}
+
+func databaseFileURL(dbPath string) *url.URL {
+	abs, err := filepath.Abs(dbPath)
+	if err != nil {
+		abs = dbPath
+	}
+	path := filepath.ToSlash(abs)
+	// A Windows drive belongs in the URI path: file:///C:/shop.db.
+	// Without the leading slash, URL.String emits file://C:/shop.db,
+	// which SQLite interprets as an invalid authority instead of a drive.
+	if filepath.VolumeName(abs) != "" && !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	return &url.URL{Scheme: "file", Path: path}
 }
 
 // Conn returns the underlying *sql.DB for use by store implementations.
