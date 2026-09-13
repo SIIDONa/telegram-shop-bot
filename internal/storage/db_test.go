@@ -162,3 +162,58 @@ func TestOpenReadOnlyDoesNotCreateMissingDatabase(t *testing.T) {
 		t.Fatalf("missing database was created: %v", err)
 	}
 }
+
+func TestExistingDatabaseOpenersPreserveFilePath(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		open     func(string) (*DB, error)
+		readOnly bool
+	}{
+		{name: "read-only", open: OpenReadOnly, readOnly: true},
+		{name: "read-write", open: OpenReadWriteExisting},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "магазин #1 100%.db")
+			db, err := New(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := db.Conn().Exec(`INSERT INTO categories (name) VALUES ('original')`); err != nil {
+				db.Close()
+				t.Fatal(err)
+			}
+			if err := db.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			existing, err := tc.open(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer existing.Close()
+			var name string
+			if err := existing.Conn().QueryRow(`SELECT name FROM categories`).Scan(&name); err != nil {
+				t.Fatal(err)
+			}
+			if name != "original" {
+				t.Fatalf("category = %q; opened the wrong database", name)
+			}
+			_, err = existing.Conn().Exec(`UPDATE categories SET name = 'updated'`)
+			if tc.readOnly && err == nil {
+				t.Fatal("read-only connection accepted a write")
+			}
+			if !tc.readOnly && err != nil {
+				t.Fatalf("read-write connection rejected a write: %v", err)
+			}
+
+			missing := filepath.Join(t.TempDir(), "missing database.db")
+			if created, err := tc.open(missing); err == nil {
+				created.Close()
+				t.Fatal("opened a missing database")
+			}
+			if _, err := os.Stat(missing); !os.IsNotExist(err) {
+				t.Fatalf("missing database was created: %v", err)
+			}
+		})
+	}
+}

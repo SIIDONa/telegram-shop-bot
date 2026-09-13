@@ -53,13 +53,26 @@ func TestRunInitCreatesPrivateConfiguration(t *testing.T) {
 	if strings.Contains(output.String(), testToken) {
 		t.Fatal("stdout leaked token")
 	}
-	if info, err := os.Stat(envPath); err != nil || info.Mode().Perm() != 0o600 {
-		t.Fatalf("mode = %v, err = %v; want 0600", info.Mode().Perm(), err)
+	info, err := os.Stat(envPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !info.Mode().IsRegular() {
+		t.Fatalf("configuration mode = %v; want a regular file", info.Mode())
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
+		t.Fatalf("mode = %v; want 0600", info.Mode().Perm())
 	}
 	for _, name := range []string{"data", "backups"} {
 		info, err := os.Stat(filepath.Join(dir, name))
-		if err != nil || !info.IsDir() || info.Mode().Perm() != 0o700 {
-			t.Fatalf("%s mode = %v, err = %v; want directory 0700", name, info.Mode().Perm(), err)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !info.IsDir() {
+			t.Fatalf("%s mode = %v; want a directory", name, info.Mode())
+		}
+		if runtime.GOOS != "windows" && info.Mode().Perm() != 0o700 {
+			t.Fatalf("%s mode = %v; want 0700", name, info.Mode().Perm())
 		}
 	}
 }
@@ -180,8 +193,14 @@ func TestRunInitBattleTwentyFreshDirectories(t *testing.T) {
 				t.Fatalf("RunInit() error = %v", err)
 			}
 			info, err := os.Stat(envPath)
-			if err != nil || info.Mode().Perm() != 0o600 {
-				t.Fatalf("mode = %v, err = %v", info.Mode().Perm(), err)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !info.Mode().IsRegular() {
+				t.Fatalf("configuration mode = %v; want a regular file", info.Mode())
+			}
+			if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
+				t.Fatalf("mode = %v; want 0600", info.Mode().Perm())
 			}
 		})
 	}

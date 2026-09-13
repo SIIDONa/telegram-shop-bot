@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -159,7 +160,11 @@ func TestRunDoctorWarnsOnSharedConfigurationAndWebhookMismatch(t *testing.T) {
 	if report.ExitCode() != 0 || !report.HasWarnings() {
 		t.Fatalf("report = %+v", report)
 	}
-	for _, expected := range []string{"chmod 600", "does not match WEBHOOK_URL", "3 queued", "recent delivery error"} {
+	expectedDetails := []string{"does not match WEBHOOK_URL", "3 queued", "recent delivery error"}
+	if runtime.GOOS != "windows" {
+		expectedDetails = append(expectedDetails, "chmod 600")
+	}
+	for _, expected := range expectedDetails {
 		if !strings.Contains(output.String(), expected) {
 			t.Fatalf("missing %q in output:\n%s", expected, output.String())
 		}

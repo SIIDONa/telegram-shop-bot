@@ -14,6 +14,7 @@ builds:
       - CGO_ENABLED=0
     goos:
       - linux
+      - windows
     goarch:
       - amd64
       - arm64
@@ -26,16 +27,21 @@ builds:
 archives:
   - id: default
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
     files:
       - .env.example
       - locales/**
       - README.md
-      - docs/readme/**
+      - docs/**
+      - CONTRIBUTING.md
       - CHANGELOG.md
       - LICENSE
 
 checksum:
   name_template: "checksums.txt"
+  algorithm: sha256
 
 changelog:
   sort: asc
@@ -53,6 +59,8 @@ dockers:
   - image_templates:
       - "ghcr.io/jumpcodefrog/telegram-shop-bot:{{ .Tag }}"
       - "ghcr.io/jumpcodefrog/telegram-shop-bot:latest"
+    goos: linux
+    goarch: amd64
     dockerfile: Dockerfile.release
     extra_files:
       - locales/
@@ -69,6 +77,33 @@ release:
     name: telegram-shop-bot
   name_template: "v{{ .Version }}"
   footer: |
+    ## SHA-256 verification
+
+    Download `checksums.txt` and your archive from this release. Verify the
+    archive before extracting or running it. SHA-256 checks file integrity;
+    it is not a digital signature of the author.
+
+    Windows (PowerShell):
+
+    ```powershell
+    Get-FileHash -LiteralPath .\telegram-shop-bot_{{ .Version }}_windows_amd64.zip -Algorithm SHA256
+    ```
+
+    Compare the hash with the line for that exact filename below or in
+    `checksums.txt` (case does not matter). Use `windows_arm64.zip` for ARM64.
+
+    Linux (run in the folder containing the archive and `checksums.txt`):
+
+    ```bash
+    sha256sum --check --ignore-missing checksums.txt
+    ```
+
+    Your downloaded archive must report `OK`. Do not use a file that fails verification.
+
+    ```text
+    {{ .Checksums }}
+    ```
+
     ## Docker
 
     ```bash
@@ -77,10 +112,23 @@ release:
 
     ## Quick Start
 
+    Download the archive for your operating system and processor: `amd64` for
+    Intel/AMD PCs, or `arm64` for ARM devices. Extract the entire archive and
+    open a terminal in that folder; keep `locales/` next to the executable.
+    Go, Make, and Docker are not required for the downloaded binary.
+
+    Windows (PowerShell):
+
+    ```powershell
+    .\telegram-shop-bot.exe quickstart
+    ```
+
+    Linux:
+
     ```bash
     ./telegram-shop-bot quickstart
     ```
 
     The guided setup asks for the BotFather token and your Telegram user ID,
-    validates them, writes a private `.env`, runs diagnostics, and starts the shop.
+    validates them, creates `.env`, runs diagnostics, and starts the shop.
     See [Getting Started](https://github.com/JumpCodeFrog/telegram-shop-bot/blob/main/docs/getting-started.md) for source and Docker paths.
