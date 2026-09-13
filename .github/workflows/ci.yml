@@ -26,6 +26,7 @@ jobs:
         run: go build ./...
 
       - name: Test with coverage
+        shell: bash
         run: go test -coverprofile=coverage.out ./...
 
       - name: Coverage summary
