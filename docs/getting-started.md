@@ -22,6 +22,8 @@ Prebuilt releases need no Go, Make, or Docker. Building from source requires [Go
 
 Download a release for your system from [GitHub Releases](https://github.com/JumpCodeFrog/telegram-shop-bot/releases). Both Windows and Linux builds offer `amd64` for Intel/AMD processors and `arm64` for ARM processors. Windows archives are available from v3.0.1.
 
+Download `checksums.txt` from the same release and [verify the archive's SHA-256](release-verification.md) before extracting it.
+
 **Windows:** download the matching Windows ZIP and extract the entire archive, including `locales`. Open PowerShell in the extracted directory containing `telegram-shop-bot.exe`:
 
 ```powershell

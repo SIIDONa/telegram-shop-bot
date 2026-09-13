@@ -41,6 +41,7 @@ archives:
 
 checksum:
   name_template: "checksums.txt"
+  algorithm: sha256
 
 changelog:
   sort: asc
@@ -76,6 +77,33 @@ release:
     name: telegram-shop-bot
   name_template: "v{{ .Version }}"
   footer: |
+    ## SHA-256 verification
+
+    Download `checksums.txt` and your archive from this release. Verify the
+    archive before extracting or running it. SHA-256 checks file integrity;
+    it is not a digital signature of the author.
+
+    Windows (PowerShell):
+
+    ```powershell
+    Get-FileHash -LiteralPath .\telegram-shop-bot_{{ .Version }}_windows_amd64.zip -Algorithm SHA256
+    ```
+
+    Compare the hash with the line for that exact filename below or in
+    `checksums.txt` (case does not matter). Use `windows_arm64.zip` for ARM64.
+
+    Linux (run in the folder containing the archive and `checksums.txt`):
+
+    ```bash
+    sha256sum --check --ignore-missing checksums.txt
+    ```
+
+    Your downloaded archive must report `OK`. Do not use a file that fails verification.
+
+    ```text
+    {{ .Checksums }}
+    ```
+
     ## Docker
 
     ```bash

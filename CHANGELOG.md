@@ -11,6 +11,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 
 - **Windows release downloads** — native `amd64` and `arm64` executables packaged as ZIP archives alongside the existing Linux archives. Downloads include translations, example settings, and setup documentation; the guided setup runs directly from PowerShell without Go, Make, or Docker.
+- **Visible SHA-256 verification** — explicitly configured SHA-256 for the existing `checksums.txt` release manifest, included the sums and verification commands in release notes, and documented checking downloaded archives in PowerShell and Linux.
 
 ### Fixed
 

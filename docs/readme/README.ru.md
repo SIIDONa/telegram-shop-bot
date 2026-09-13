@@ -69,6 +69,8 @@
 
 Скачай архив для своей системы в [GitHub Releases](https://github.com/JumpCodeFrog/telegram-shop-bot/releases): Windows (`.zip`, начиная с v3.0.1) или Linux (`.tar.gz`). Выбирай `amd64` для процессоров Intel/AMD или `arm64` для ARM. Для готовой сборки Go, Make и Docker не нужны.
 
+Скачай `checksums.txt` из **того же релиза** и [проверь SHA-256 архива](../release-verification.md) перед распаковкой и запуском. Такая проверка подтверждает целостность файла; подпись автора она не заменяет.
+
 **Windows:** распакуй ZIP целиком, включая папку `locales`. Открой PowerShell в распакованной папке с `telegram-shop-bot.exe` и выполни:
 
 ```powershell

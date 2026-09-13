@@ -89,6 +89,8 @@ Get a token from [@BotFather](https://t.me/BotFather), then choose a release bin
 
 Download the archive for your system from [GitHub Releases](https://github.com/JumpCodeFrog/telegram-shop-bot/releases): Windows (`.zip`, available from v3.0.1) or Linux (`.tar.gz`). Choose `amd64` for Intel/AMD processors or `arm64` for ARM processors. Prebuilt binaries need no Go, Make, or Docker.
 
+Download `checksums.txt` from the **same release** and [verify the archive's SHA-256](docs/release-verification.md) before extracting or running it. This checks file integrity; it does not provide an author signature.
+
 **Windows:** extract the entire ZIP, including the `locales` folder. Open PowerShell in the extracted directory containing `telegram-shop-bot.exe`, then run:
 
 ```powershell
