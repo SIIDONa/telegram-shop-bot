@@ -83,7 +83,8 @@ type Bot struct {
 	pendingSubSignals   map[string]pendingSubscriptionSignal
 	// uiStyles is an in-memory cache of button style overrides loaded from DB.
 	// Invalidated and reloaded whenever an admin changes a button style.
-	uiStyles sync.Map
+	uiStyles     sync.Map
+	adminActions sync.Map
 
 	// handler is the fully-chained update handler (used for both polling and webhook).
 	handler func(tgbotapi.Update)

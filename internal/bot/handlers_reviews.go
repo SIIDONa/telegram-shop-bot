@@ -242,25 +242,28 @@ func (b *Bot) handleReviewsAdmin(msg *tgbotapi.Message) {
 	if !b.isAdmin(msg.From.ID) {
 		return
 	}
-	lang := msg.From.LanguageCode
+	b.sendAdminReviews(msg.Chat.ID, 0, msg.From.LanguageCode)
+}
 
+func (b *Bot) sendAdminReviews(chatID int64, msgID int, lang string) {
 	ctx, cancel := handlerCtx()
 	defer cancel()
 	reviews, err := b.reviews.ListRecent(ctx, 10)
 	if err != nil {
 		b.logger.Error("review: list recent", "error", err)
-		b.send(tgbotapi.NewMessage(msg.Chat.ID, b.t(lang, "review_error")))
+		b.send(tgbotapi.NewMessage(chatID, b.t(lang, "review_error")))
 		return
 	}
 	if len(reviews) == 0 {
-		b.send(tgbotapi.NewMessage(msg.Chat.ID, b.t(lang, "review_admin_empty")))
+		kb := StyledKeyboard{{{Btn("◀️ Admin Menu", "admin:menu")}}}
+		b.sendOrEditStyled(chatID, msgID, b.t(lang, "review_admin_empty"), "", kb)
 		return
 	}
 
 	var sb strings.Builder
 	sb.WriteString(b.t(lang, "review_admin_title"))
 	sb.WriteString("\n\n")
-	kb := make(StyledKeyboard, 0, len(reviews))
+	kb := make(StyledKeyboard, 0, len(reviews)+1)
 	for _, r := range reviews {
 		sb.WriteString(fmt.Sprintf("#%d | user %d | product %d | %s\n", r.ID, r.UserID, r.ProductID, strings.Repeat("⭐", r.Rating)))
 		if r.Text != "" {
@@ -268,11 +271,10 @@ func (b *Bot) handleReviewsAdmin(msg *tgbotapi.Message) {
 			sb.WriteString("\n")
 		}
 		sb.WriteString("\n")
-		kb = append(kb, []StyledButton{BtnDanger(fmt.Sprintf("🗑 #%d", r.ID), fmt.Sprintf("review:del:%d", r.ID))})
+		kb = append(kb, []StyledButton{BtnDanger(fmt.Sprintf("🗑 Delete #%d", r.ID), fmt.Sprintf("review:del:%d", r.ID))})
 	}
-	if err := b.sendStyled(msg.Chat.ID, strings.TrimRight(sb.String(), "\n"), "", kb); err != nil {
-		b.logger.Error("review: send admin list", "error", err)
-	}
+	kb = append(kb, []StyledButton{Btn("◀️ Admin Menu", "admin:menu")})
+	b.sendOrEditStyled(chatID, msgID, strings.TrimRight(sb.String(), "\n"), "", kb)
 }
 
 // onReviewDelete removes a review by ID ("review:del:<id>", admin only —

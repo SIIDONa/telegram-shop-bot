@@ -30,10 +30,7 @@ func (b *Bot) handleAdmin(msg *tgbotapi.Message) {
 	if !b.isAdmin(msg.From.ID) {
 		return
 	}
-
-	text := b.t(msg.From.LanguageCode, "admin_panel")
-
-	b.send(tgbotapi.NewMessage(msg.Chat.ID, text))
+	b.sendAdminMenu(msg.Chat.ID, 0, msg.From.LanguageCode)
 }
 
 func (b *Bot) handleAddProduct(msg *tgbotapi.Message) {
@@ -783,6 +780,9 @@ func (b *Bot) sendAnalytics(chatID int64, msgID int, days int, lang string) {
 			tgbotapi.NewInlineKeyboardButtonData(b.i18n.Tf(lang, "admin_analytics_btn_days", 14), "analytics:14"),
 			tgbotapi.NewInlineKeyboardButtonData(b.i18n.Tf(lang, "admin_analytics_btn_days", 30), "analytics:30"),
 		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("◀️ Admin Menu", "admin:menu"),
+		),
 	)
 
 	if msgID > 0 {
@@ -1018,6 +1018,7 @@ func (b *Bot) sendBtnStyleList(chatID int64, msgID int, lang string) {
 		}
 		rows = append(rows, row)
 	}
+	rows = append(rows, []StyledButton{Btn("◀️ Admin Menu", "admin:menu")})
 
 	kb := StyledKeyboard(rows)
 	b.sendOrEditStyled(chatID, msgID, sb.String(), "HTML", kb)
@@ -1091,4 +1092,633 @@ func styleLabel(s ButtonStyle) string {
 	default:
 		return "default"
 	}
+}
+
+// -------------------------------------------------------------
+// Interactive 100% Inline Button Admin UI
+// -------------------------------------------------------------
+
+func (b *Bot) startAddProductWizard(chatID, userID int64, lang string) {
+	ctx := context.Background()
+	_ = b.fsm.SetAddProductState(ctx, userID, &storage.AddProductState{Step: storage.StepName, CreatedAt: time.Now()}, 30*time.Minute)
+	b.send(tgbotapi.NewMessage(chatID, b.t(lang, "admin_add_product_name")))
+}
+
+// sendAdminMenu renders the interactive admin dashboard with 100% inline buttons.
+func (b *Bot) sendAdminMenu(chatID int64, msgID int, lang string) {
+	text := "🛠 <b>Admin Dashboard</b>\n\nManage products, categories, orders, promo codes, and analytics completely from here:"
+	kb := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🛍 Products", "admin:products:cats"),
+			tgbotapi.NewInlineKeyboardButtonData("📂 Categories", "admin:categories"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("📦 Orders", "admin:orders:all"),
+			tgbotapi.NewInlineKeyboardButtonData("🏷 Promo Codes", "admin:promos"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("📊 Analytics", "analytics:14"),
+			tgbotapi.NewInlineKeyboardButtonData("💬 Reviews", "admin:reviews"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🎨 Button Colors", "admin:btnlist"),
+			tgbotapi.NewInlineKeyboardButtonData("📥 Export CSV", "admin:export"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🏠 Client Menu", "back:catalog"),
+		),
+	)
+	if msgID > 0 {
+		edit := tgbotapi.NewEditMessageText(chatID, msgID, text)
+		edit.ParseMode = "HTML"
+		edit.ReplyMarkup = &kb
+		b.send(edit)
+		return
+	}
+	reply := tgbotapi.NewMessage(chatID, text)
+	reply.ParseMode = "HTML"
+	reply.ReplyMarkup = kb
+	b.send(reply)
+}
+
+func (b *Bot) sendAdminCategories(chatID int64, msgID int, lang string) {
+	ctx := context.Background()
+	categories, err := b.catalog.GetCategories(ctx)
+	if err != nil {
+		b.logger.Error("admin categories: list", "error", err)
+		return
+	}
+
+	var rows [][]tgbotapi.InlineKeyboardButton
+	text := "📂 <b>Categories Management</b>\n\nTap a category to view/delete it, or add a new one:"
+	if len(categories) == 0 {
+		text += "\n\n<i>No categories created yet.</i>"
+	} else {
+		for _, cat := range categories {
+			btnText := fmt.Sprintf("%s %s", cat.Emoji, cat.Name)
+			rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData(btnText, fmt.Sprintf("admin:cat:view:%d", cat.ID)),
+			))
+		}
+	}
+
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("➕ Add Category", "admin:cat:add"),
+	))
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("◀️ Admin Menu", "admin:menu"),
+	))
+
+	kb := tgbotapi.NewInlineKeyboardMarkup(rows...)
+	if msgID > 0 {
+		edit := tgbotapi.NewEditMessageText(chatID, msgID, text)
+		edit.ParseMode = "HTML"
+		edit.ReplyMarkup = &kb
+		b.send(edit)
+		return
+	}
+	msg := tgbotapi.NewMessage(chatID, text)
+	msg.ParseMode = "HTML"
+	msg.ReplyMarkup = kb
+	b.send(msg)
+}
+
+func (b *Bot) sendAdminCategoryView(chatID int64, msgID int, catID int64, lang string) {
+	ctx := context.Background()
+	cat, err := b.products.GetCategory(ctx, catID)
+	if err != nil {
+		b.logger.Error("admin category view: get", "error", err)
+		return
+	}
+	products, _ := b.products.GetProductsByCategory(ctx, catID)
+
+	text := fmt.Sprintf("📂 <b>Category #%d</b>\n\nName: %s %s\nTotal Products: %d", cat.ID, cat.Emoji, cat.Name, len(products))
+
+	kb := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(fmt.Sprintf("🛍 View Products (%d)", len(products)), fmt.Sprintf("admin:prod:cat:%d", cat.ID)),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🗑 Delete Category", fmt.Sprintf("admin:cat:del:%d", cat.ID)),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("◀️ Back to Categories", "admin:categories"),
+		),
+	)
+
+	if msgID > 0 {
+		edit := tgbotapi.NewEditMessageText(chatID, msgID, text)
+		edit.ParseMode = "HTML"
+		edit.ReplyMarkup = &kb
+		b.send(edit)
+		return
+	}
+	msg := tgbotapi.NewMessage(chatID, text)
+	msg.ParseMode = "HTML"
+	msg.ReplyMarkup = kb
+	b.send(msg)
+}
+
+func (b *Bot) onAdminCategoryDelete(cbID string, chatID int64, msgID int, catID int64, lang string) {
+	ctx := context.Background()
+	if err := b.products.DeleteCategory(ctx, catID); err != nil {
+		b.logger.Error("admin delete category", "cat_id", catID, "error", err)
+		b.alert(cbID, b.t(lang, "admin_category_delete_failed"))
+		return
+	}
+	b.alert(cbID, b.t(lang, "admin_category_deleted"))
+	b.sendAdminCategories(chatID, msgID, lang)
+}
+
+func (b *Bot) onAdminCategoryAddPrompt(chatID, userID int64, lang string) {
+	b.adminActions.Store(userID, "add_category")
+	msg := tgbotapi.NewMessage(chatID, "📂 <b>Add Category</b>\n\nPlease send the category emoji and name (e.g., <code>👟 Shoes</code> or <code>📱 Phones</code>).\n\nSend /cancel to abort.")
+	msg.ParseMode = "HTML"
+	b.send(msg)
+}
+
+func (b *Bot) sendAdminProductCategories(chatID int64, msgID int, lang string) {
+	ctx := context.Background()
+	categories, err := b.catalog.GetCategories(ctx)
+	if err != nil {
+		b.logger.Error("admin product categories: list", "error", err)
+		return
+	}
+
+	var rows [][]tgbotapi.InlineKeyboardButton
+	text := "🛍 <b>Products Management</b>\n\nSelect a category to view and manage products:"
+	for _, cat := range categories {
+		btnText := fmt.Sprintf("%s %s", cat.Emoji, cat.Name)
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(btnText, fmt.Sprintf("admin:prod:cat:%d", cat.ID)),
+		))
+	}
+
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("➕ Add New Product", "admin:prod:add"),
+	))
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("◀️ Admin Menu", "admin:menu"),
+	))
+
+	kb := tgbotapi.NewInlineKeyboardMarkup(rows...)
+	if msgID > 0 {
+		edit := tgbotapi.NewEditMessageText(chatID, msgID, text)
+		edit.ParseMode = "HTML"
+		edit.ReplyMarkup = &kb
+		b.send(edit)
+		return
+	}
+	msg := tgbotapi.NewMessage(chatID, text)
+	msg.ParseMode = "HTML"
+	msg.ReplyMarkup = kb
+	b.send(msg)
+}
+
+func (b *Bot) sendAdminCategoryProducts(chatID int64, msgID int, catID int64, lang string) {
+	ctx := context.Background()
+	cat, err := b.products.GetCategory(ctx, catID)
+	if err != nil {
+		b.logger.Error("admin category products: get category", "error", err)
+		return
+	}
+	products, _ := b.products.GetProductsByCategory(ctx, catID)
+
+	text := fmt.Sprintf("🛍 <b>Products in %s %s</b> (%d items):", cat.Emoji, cat.Name, len(products))
+	var rows [][]tgbotapi.InlineKeyboardButton
+	for _, p := range products {
+		stockStatus := fmt.Sprintf("(%d in stock)", p.Stock)
+		if !p.IsActive || p.Stock <= 0 {
+			stockStatus = "(Out of Stock)"
+		}
+		label := fmt.Sprintf("• %s - $%.2f %s", p.Name, p.PriceUSD, stockStatus)
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(label, fmt.Sprintf("admin:prod:view:%d", p.ID)),
+		))
+	}
+
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("➕ Add Product to this Category", "admin:prod:add"),
+	))
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("◀️ Back to Categories", "admin:products:cats"),
+	))
+
+	kb := tgbotapi.NewInlineKeyboardMarkup(rows...)
+	if msgID > 0 {
+		edit := tgbotapi.NewEditMessageText(chatID, msgID, text)
+		edit.ParseMode = "HTML"
+		edit.ReplyMarkup = &kb
+		b.send(edit)
+		return
+	}
+	msg := tgbotapi.NewMessage(chatID, text)
+	msg.ParseMode = "HTML"
+	msg.ReplyMarkup = kb
+	b.send(msg)
+}
+
+func (b *Bot) sendAdminProductView(chatID int64, msgID int, prodID int64, lang string) {
+	ctx := context.Background()
+	p, err := b.products.GetProduct(ctx, prodID)
+	if err != nil {
+		b.logger.Error("admin product view: get", "prod_id", prodID, "error", err)
+		return
+	}
+
+	statusText := "Active"
+	if !p.IsActive {
+		statusText = "Inactive"
+	}
+	subText := "None"
+	if p.SubPeriodDays > 0 {
+		subText = fmt.Sprintf("%d days (Recurring)", p.SubPeriodDays)
+	}
+
+	text := fmt.Sprintf("📦 <b>Product #%d</b>\n\n"+
+		"<b>Name:</b> %s\n"+
+		"<b>Description:</b> %s\n"+
+		"<b>Price:</b> $%.2f / %d ⭐\n"+
+		"<b>Stock:</b> %d pcs\n"+
+		"<b>Status:</b> %s\n"+
+		"<b>Subscription:</b> %s",
+		p.ID, p.Name, p.Description, p.PriceUSD, p.PriceStars, p.Stock, statusText, subText)
+
+	toggleLabel := b.t(lang, "admin_btn_stock_off")
+	if !p.IsActive || p.Stock == 0 {
+		toggleLabel = b.t(lang, "admin_btn_stock_on")
+	}
+
+	kb := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(toggleLabel, fmt.Sprintf("admin:togglestock:%d", p.ID)),
+			tgbotapi.NewInlineKeyboardButtonData(b.t(lang, "admin_photo_btn"), fmt.Sprintf("admin:photos:%d", p.ID)),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🗑 Delete Product", fmt.Sprintf("admin:prod:del:%d", p.ID)),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("◀️ Back to Category", fmt.Sprintf("admin:prod:cat:%d", p.CategoryID)),
+		),
+	)
+
+	if msgID > 0 {
+		edit := tgbotapi.NewEditMessageText(chatID, msgID, text)
+		edit.ParseMode = "HTML"
+		edit.ReplyMarkup = &kb
+		b.send(edit)
+		return
+	}
+	msg := tgbotapi.NewMessage(chatID, text)
+	msg.ParseMode = "HTML"
+	msg.ReplyMarkup = kb
+	b.send(msg)
+}
+
+func (b *Bot) onAdminProductDelete(cbID string, chatID int64, msgID int, prodID int64, lang string) {
+	ctx := context.Background()
+	p, err := b.products.GetProduct(ctx, prodID)
+	catID := int64(0)
+	if err == nil && p != nil {
+		catID = p.CategoryID
+	}
+	if err := b.products.DeleteProduct(ctx, prodID); err != nil {
+		b.logger.Error("admin delete product", "prod_id", prodID, "error", err)
+		b.alert(cbID, b.t(lang, "admin_product_delete_failed"))
+		return
+	}
+	b.alert(cbID, b.t(lang, "admin_product_deleted"))
+	if catID > 0 {
+		b.sendAdminCategoryProducts(chatID, msgID, catID, lang)
+	} else {
+		b.sendAdminProductCategories(chatID, msgID, lang)
+	}
+}
+
+func (b *Bot) sendAdminOrders(chatID int64, msgID int, filter string, lang string) {
+	ctx := context.Background()
+	statusFilter := ""
+	if filter != "all" {
+		statusFilter = filter
+	}
+
+	orders, err := b.order.GetAllOrders(ctx, statusFilter)
+	if err != nil {
+		b.logger.Error("admin orders: get all", "filter", filter, "error", err)
+		return
+	}
+
+	allBtn := "All"
+	pendingBtn := "⏳ Pending"
+	paidBtn := "💳 Paid"
+	deliveredBtn := "🚚 Delivered"
+	switch filter {
+	case "all":
+		allBtn = "• All •"
+	case "pending":
+		pendingBtn = "• ⏳ Pending •"
+	case "paid":
+		paidBtn = "• 💳 Paid •"
+	case "delivered":
+		deliveredBtn = "• 🚚 Delivered •"
+	}
+
+	filterRow := tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData(allBtn, "admin:orders:all"),
+		tgbotapi.NewInlineKeyboardButtonData(pendingBtn, "admin:orders:pending"),
+		tgbotapi.NewInlineKeyboardButtonData(paidBtn, "admin:orders:paid"),
+		tgbotapi.NewInlineKeyboardButtonData(deliveredBtn, "admin:orders:delivered"),
+	)
+
+	var rows [][]tgbotapi.InlineKeyboardButton
+	rows = append(rows, filterRow)
+
+	text := fmt.Sprintf("📦 <b>Orders Management</b> (Filter: %s - %d orders):\n\nTap an order to view details or update status:", filter, len(orders))
+	if len(orders) == 0 {
+		text += "\n\n<i>No orders found in this filter.</i>"
+	} else {
+		count := len(orders)
+		if count > 15 {
+			count = 15
+		}
+		for i := 0; i < count; i++ {
+			o := orders[i]
+			statusSymbol := "⏳"
+			if o.Status == storage.OrderStatusPaid {
+				statusSymbol = "💳"
+			} else if o.Status == storage.OrderStatusDelivered {
+				statusSymbol = "🚚"
+			} else if o.Status == storage.OrderStatusCanceled {
+				statusSymbol = "❌"
+			}
+			label := fmt.Sprintf("%s #%d | User %d | $%.2f", statusSymbol, o.ID, o.UserID, o.TotalUSD)
+			rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData(label, fmt.Sprintf("admin:order:view:%d:%s", o.ID, filter)),
+			))
+		}
+	}
+
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("◀️ Admin Menu", "admin:menu"),
+	))
+
+	kb := tgbotapi.NewInlineKeyboardMarkup(rows...)
+	if msgID > 0 {
+		edit := tgbotapi.NewEditMessageText(chatID, msgID, text)
+		edit.ParseMode = "HTML"
+		edit.ReplyMarkup = &kb
+		b.send(edit)
+		return
+	}
+	msg := tgbotapi.NewMessage(chatID, text)
+	msg.ParseMode = "HTML"
+	msg.ReplyMarkup = kb
+	b.send(msg)
+}
+
+func (b *Bot) sendAdminOrderView(chatID int64, msgID int, orderID int64, backFilter string, lang string) {
+	ctx := context.Background()
+	order, err := b.order.GetOrder(ctx, orderID)
+	if err != nil {
+		b.logger.Error("admin order view: get", "order_id", orderID, "error", err)
+		return
+	}
+
+	statusDisplay := storage.StatusDisplay[order.Status]
+	if statusDisplay == "" {
+		statusDisplay = order.Status
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("📦 <b>Order #%d</b>\n\n", order.ID))
+	sb.WriteString(fmt.Sprintf("<b>Customer ID:</b> <code>%d</code>\n", order.UserID))
+	sb.WriteString(fmt.Sprintf("<b>Status:</b> %s\n", statusDisplay))
+	sb.WriteString(fmt.Sprintf("<b>Total:</b> $%.2f / %d ⭐\n", order.TotalUSD, order.TotalStars))
+	if order.PaymentMethod != "" {
+		sb.WriteString(fmt.Sprintf("<b>Payment:</b> %s\n", order.PaymentMethod))
+	}
+	if order.PromoCode != "" {
+		sb.WriteString(fmt.Sprintf("<b>Promo:</b> %s (-%d%%)\n", order.PromoCode, order.DiscountPct))
+	}
+	sb.WriteString(fmt.Sprintf("<b>Created:</b> %s\n\n", order.CreatedAt.Format("02.01.2006 15:04")))
+
+	if len(order.Items) > 0 {
+		sb.WriteString("<b>Items:</b>\n")
+		for _, item := range order.Items {
+			sb.WriteString(fmt.Sprintf("• %s × %d — $%.2f\n", item.ProductName, item.Quantity, item.PriceUSD))
+		}
+	}
+
+	var actionRows [][]tgbotapi.InlineKeyboardButton
+	if order.Status == storage.OrderStatusPaid {
+		actionRows = append(actionRows, tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("✅ Mark as Delivered", fmt.Sprintf("admin:order:deliver:%d:%s", order.ID, backFilter)),
+		))
+	}
+
+	actionRows = append(actionRows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("◀️ Back to Orders", fmt.Sprintf("admin:orders:%s", backFilter)),
+	))
+
+	kb := tgbotapi.NewInlineKeyboardMarkup(actionRows...)
+	if msgID > 0 {
+		edit := tgbotapi.NewEditMessageText(chatID, msgID, sb.String())
+		edit.ParseMode = "HTML"
+		edit.ReplyMarkup = &kb
+		b.send(edit)
+		return
+	}
+	msg := tgbotapi.NewMessage(chatID, sb.String())
+	msg.ParseMode = "HTML"
+	msg.ReplyMarkup = kb
+	b.send(msg)
+}
+
+func (b *Bot) onAdminOrderDeliver(cbID string, chatID int64, msgID int, orderID int64, backFilter string, lang string) {
+	ctx := context.Background()
+	order, err := b.order.SetDelivered(ctx, orderID)
+	if err != nil {
+		b.logger.Error("admin set delivered", "order_id", orderID, "error", err)
+		b.alert(cbID, b.t(lang, "admin_set_delivered_failed"))
+		return
+	}
+	b.alert(cbID, fmt.Sprintf(b.t(lang, "admin_delivered_ok"), order.ID))
+
+	b.sendReviewInvite(ctx, order)
+	b.notifyAdmins(ctx, AdminEventOrderDelivered, fmt.Sprintf(b.t("en", "admin_order_delivered"), order.ID, order.UserID))
+	b.outWebhook.Send(service.OutboundWebhookEvent{
+		Event:      "order.delivered",
+		OrderID:    order.ID,
+		UserID:     order.UserID,
+		TotalUSD:   order.TotalUSD,
+		TotalStars: order.TotalStars,
+	})
+
+	b.sendAdminOrderView(chatID, msgID, orderID, backFilter, lang)
+}
+
+func (b *Bot) sendAdminPromos(chatID int64, msgID int, lang string) {
+	ctx := context.Background()
+	promos, err := b.promos.ListPromos(ctx)
+	if err != nil {
+		b.logger.Error("admin promos: list", "error", err)
+		return
+	}
+
+	text := "🏷 <b>Promo Codes Management</b>\n\nActive promo codes:"
+	var rows [][]tgbotapi.InlineKeyboardButton
+	if len(promos) == 0 {
+		text += "\n\n<i>No active promo codes.</i>"
+	} else {
+		for _, p := range promos {
+			label := fmt.Sprintf("🏷 %s (-%d%%)", p.Code, p.Discount)
+			rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData(label, "noop"),
+				tgbotapi.NewInlineKeyboardButtonData("❌ Deactivate", fmt.Sprintf("admin:promo:del:%d", p.ID)),
+			))
+		}
+	}
+
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("➕ Add Promo Code", "admin:promo:add"),
+	))
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("◀️ Admin Menu", "admin:menu"),
+	))
+
+	kb := tgbotapi.NewInlineKeyboardMarkup(rows...)
+	if msgID > 0 {
+		edit := tgbotapi.NewEditMessageText(chatID, msgID, text)
+		edit.ParseMode = "HTML"
+		edit.ReplyMarkup = &kb
+		b.send(edit)
+		return
+	}
+	msg := tgbotapi.NewMessage(chatID, text)
+	msg.ParseMode = "HTML"
+	msg.ReplyMarkup = kb
+	b.send(msg)
+}
+
+func (b *Bot) onAdminPromoDelete(cbID string, chatID int64, msgID int, promoID int64, lang string) {
+	ctx := context.Background()
+	if err := b.promos.DeactivatePromo(ctx, promoID); err != nil {
+		b.logger.Error("admin promo delete", "promo_id", promoID, "error", err)
+		return
+	}
+	b.alert(cbID, b.t(lang, "admin_promo_deactivated"))
+	b.sendAdminPromos(chatID, msgID, lang)
+}
+
+func (b *Bot) onAdminPromoAddPrompt(chatID, userID int64, lang string) {
+	b.adminActions.Store(userID, "add_promo")
+	msg := tgbotapi.NewMessage(chatID, "🏷 <b>Add Promo Code</b>\n\nPlease send the promo code and discount percentage separated by space (e.g., <code>SUMMER 15</code> for 15% discount).\n\nSend /cancel to abort.")
+	msg.ParseMode = "HTML"
+	b.send(msg)
+}
+
+func (b *Bot) onAdminExportOrders(chatID int64, lang string) {
+	orders, err := b.order.GetAllOrders(context.Background(), "")
+	if err != nil {
+		b.logger.Error("export orders", "error", err)
+		b.send(tgbotapi.NewMessage(chatID, b.t(lang, "admin_export_failed")))
+		return
+	}
+
+	var buf bytes.Buffer
+	writer := csv.NewWriter(&buf)
+	_ = writer.Write([]string{"order_id", "user_id", "status", "total_usd", "total_stars", "payment_method", "promo_code", "created_at"})
+	for _, o := range orders {
+		_ = writer.Write([]string{
+			strconv.FormatInt(o.ID, 10),
+			strconv.FormatInt(o.UserID, 10),
+			o.Status,
+			fmt.Sprintf("%.2f", o.TotalUSD),
+			strconv.Itoa(o.TotalStars),
+			o.PaymentMethod,
+			o.PromoCode,
+			o.CreatedAt.Format(time.RFC3339),
+		})
+	}
+	writer.Flush()
+
+	doc := tgbotapi.NewDocument(chatID, tgbotapi.FileBytes{
+		Name:  fmt.Sprintf("orders_%s.csv", time.Now().Format("2006-01-02")),
+		Bytes: buf.Bytes(),
+	})
+	doc.Caption = fmt.Sprintf(b.t(lang, "admin_export_caption"), len(orders))
+	b.send(doc)
+}
+
+func (b *Bot) handleAdminActionInput(msg *tgbotapi.Message, action string) bool {
+	ctx := context.Background()
+	lang := msg.From.LanguageCode
+	chatID := msg.Chat.ID
+	userID := msg.From.ID
+
+	if msg.Text == "/cancel" {
+		b.adminActions.Delete(userID)
+		b.send(tgbotapi.NewMessage(chatID, b.t(lang, "admin_cancelled")))
+		b.sendAdminMenu(chatID, 0, lang)
+		return true
+	}
+
+	switch action {
+	case "add_category":
+		b.adminActions.Delete(userID)
+		parts := strings.Fields(msg.Text)
+		if len(parts) < 1 {
+			b.send(tgbotapi.NewMessage(chatID, "Invalid format. Send /cancel or try again with: 👟 Shoes"))
+			return true
+		}
+		emoji := "📁"
+		name := msg.Text
+		if len(parts) >= 2 {
+			emoji = parts[0]
+			name = strings.Join(parts[1:], " ")
+		}
+		cat := &storage.Category{
+			Name:     name,
+			Emoji:    emoji,
+			IsActive: true,
+		}
+		catID, err := b.products.CreateCategory(ctx, cat)
+		if err != nil {
+			b.logger.Error("admin action add category", "error", err)
+			b.send(tgbotapi.NewMessage(chatID, b.t(lang, "admin_category_create_failed")))
+			return true
+		}
+		b.send(tgbotapi.NewMessage(chatID, fmt.Sprintf(b.t(lang, "admin_category_created"), catID, emoji, name)))
+		b.sendAdminCategories(chatID, 0, lang)
+		return true
+
+	case "add_promo":
+		b.adminActions.Delete(userID)
+		parts := strings.Fields(msg.Text)
+		if len(parts) < 2 {
+			b.send(tgbotapi.NewMessage(chatID, "Invalid format. Please send: CODE DISCOUNT (e.g. SUMMER 15)"))
+			return true
+		}
+		code := strings.ToUpper(parts[0])
+		discount, err := strconv.Atoi(parts[1])
+		if err != nil || discount <= 0 || discount > 100 {
+			b.send(tgbotapi.NewMessage(chatID, "Discount must be a number between 1 and 100."))
+			return true
+		}
+		promo := &storage.PromoCode{
+			Code:     code,
+			Discount: discount,
+			IsActive: true,
+		}
+		_, err = b.promos.CreatePromo(ctx, promo)
+		if err != nil {
+			b.logger.Error("admin action add promo", "error", err)
+			b.send(tgbotapi.NewMessage(chatID, "Failed to create promo code."))
+			return true
+		}
+		b.send(tgbotapi.NewMessage(chatID, b.t(lang, "admin_promo_created")))
+		b.sendAdminPromos(chatID, 0, lang)
+		return true
+	}
+	return false
 }

@@ -65,6 +65,15 @@ func (b *Bot) routeMessage(msg *tgbotapi.Message) {
 		}
 	}
 
+	// Check if admin is in an interactive action (e.g. add category, add promo).
+	if msg.Command() == "" && b.isAdmin(msg.From.ID) {
+		if action, ok := b.adminActions.Load(msg.From.ID); ok {
+			if b.handleAdminActionInput(msg, action.(string)) {
+				return
+			}
+		}
+	}
+
 	switch msg.Command() {
 	case "start":
 		b.handleStart(msg)
@@ -280,6 +289,145 @@ func (b *Bot) handleCallback(cb *tgbotapi.CallbackQuery) {
 		b.ack(cb.ID)
 		if b.isAdmin(userID) {
 			b.onAdminSetStyle(chatID, msgID, data, lang)
+		}
+
+	case data == "admin:menu":
+		b.ack(cb.ID)
+		if b.isAdmin(userID) {
+			b.sendAdminMenu(chatID, msgID, lang)
+		}
+
+	case data == "admin:categories":
+		b.ack(cb.ID)
+		if b.isAdmin(userID) {
+			b.sendAdminCategories(chatID, msgID, lang)
+		}
+
+	case data == "admin:cat:add":
+		b.ack(cb.ID)
+		if b.isAdmin(userID) {
+			b.onAdminCategoryAddPrompt(chatID, userID, lang)
+		}
+
+	case strings.HasPrefix(data, "admin:cat:view:"):
+		b.ack(cb.ID)
+		if b.isAdmin(userID) {
+			if catID, err := parseIDFromCallback(data, "admin:cat:view:"); err == nil {
+				b.sendAdminCategoryView(chatID, msgID, catID, lang)
+			}
+		}
+
+	case strings.HasPrefix(data, "admin:cat:del:"):
+		b.ack(cb.ID)
+		if b.isAdmin(userID) {
+			if catID, err := parseIDFromCallback(data, "admin:cat:del:"); err == nil {
+				b.onAdminCategoryDelete(cb.ID, chatID, msgID, catID, lang)
+			}
+		}
+
+	case data == "admin:products:cats" || data == "admin:products":
+		b.ack(cb.ID)
+		if b.isAdmin(userID) {
+			b.sendAdminProductCategories(chatID, msgID, lang)
+		}
+
+	case strings.HasPrefix(data, "admin:prod:cat:"):
+		b.ack(cb.ID)
+		if b.isAdmin(userID) {
+			if catID, err := parseIDFromCallback(data, "admin:prod:cat:"); err == nil {
+				b.sendAdminCategoryProducts(chatID, msgID, catID, lang)
+			}
+		}
+
+	case strings.HasPrefix(data, "admin:prod:view:"):
+		b.ack(cb.ID)
+		if b.isAdmin(userID) {
+			if prodID, err := parseIDFromCallback(data, "admin:prod:view:"); err == nil {
+				b.sendAdminProductView(chatID, msgID, prodID, lang)
+			}
+		}
+
+	case strings.HasPrefix(data, "admin:prod:del:"):
+		b.ack(cb.ID)
+		if b.isAdmin(userID) {
+			if prodID, err := parseIDFromCallback(data, "admin:prod:del:"); err == nil {
+				b.onAdminProductDelete(cb.ID, chatID, msgID, prodID, lang)
+			}
+		}
+
+	case data == "admin:prod:add":
+		b.ack(cb.ID)
+		if b.isAdmin(userID) {
+			b.startAddProductWizard(chatID, userID, lang)
+		}
+
+	case strings.HasPrefix(data, "admin:orders:"):
+		b.ack(cb.ID)
+		if b.isAdmin(userID) {
+			filter := strings.TrimPrefix(data, "admin:orders:")
+			b.sendAdminOrders(chatID, msgID, filter, lang)
+		}
+
+	case strings.HasPrefix(data, "admin:order:view:"):
+		b.ack(cb.ID)
+		if b.isAdmin(userID) {
+			parts := strings.Split(strings.TrimPrefix(data, "admin:order:view:"), ":")
+			if len(parts) >= 1 {
+				if orderID, err := strconv.ParseInt(parts[0], 10, 64); err == nil {
+					backFilter := "all"
+					if len(parts) >= 2 {
+						backFilter = parts[1]
+					}
+					b.sendAdminOrderView(chatID, msgID, orderID, backFilter, lang)
+				}
+			}
+		}
+
+	case strings.HasPrefix(data, "admin:order:deliver:"):
+		b.ack(cb.ID)
+		if b.isAdmin(userID) {
+			parts := strings.Split(strings.TrimPrefix(data, "admin:order:deliver:"), ":")
+			if len(parts) >= 1 {
+				if orderID, err := strconv.ParseInt(parts[0], 10, 64); err == nil {
+					backFilter := "all"
+					if len(parts) >= 2 {
+						backFilter = parts[1]
+					}
+					b.onAdminOrderDeliver(cb.ID, chatID, msgID, orderID, backFilter, lang)
+				}
+			}
+		}
+
+	case data == "admin:promos":
+		b.ack(cb.ID)
+		if b.isAdmin(userID) {
+			b.sendAdminPromos(chatID, msgID, lang)
+		}
+
+	case data == "admin:promo:add":
+		b.ack(cb.ID)
+		if b.isAdmin(userID) {
+			b.onAdminPromoAddPrompt(chatID, userID, lang)
+		}
+
+	case strings.HasPrefix(data, "admin:promo:del:"):
+		b.ack(cb.ID)
+		if b.isAdmin(userID) {
+			if promoID, err := parseIDFromCallback(data, "admin:promo:del:"); err == nil {
+				b.onAdminPromoDelete(cb.ID, chatID, msgID, promoID, lang)
+			}
+		}
+
+	case data == "admin:reviews":
+		b.ack(cb.ID)
+		if b.isAdmin(userID) {
+			b.sendAdminReviews(chatID, msgID, lang)
+		}
+
+	case data == "admin:export":
+		b.ack(cb.ID)
+		if b.isAdmin(userID) {
+			b.onAdminExportOrders(chatID, lang)
 		}
 
 	case strings.HasPrefix(data, "wish:rm:"):
