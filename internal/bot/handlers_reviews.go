@@ -255,7 +255,7 @@ func (b *Bot) sendAdminReviews(chatID int64, msgID int, lang string) {
 		return
 	}
 	if len(reviews) == 0 {
-		kb := StyledKeyboard{{{Btn("◀️ Admin Menu", "admin:menu")}}}
+		kb := StyledKeyboard{{Btn("◀️ Admin Menu", "admin:menu")}}
 		b.sendOrEditStyled(chatID, msgID, b.t(lang, "review_admin_empty"), "", kb)
 		return
 	}

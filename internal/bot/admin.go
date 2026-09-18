@@ -1448,7 +1448,7 @@ func (b *Bot) sendAdminOrders(chatID int64, msgID int, filter string, lang strin
 				statusSymbol = "💳"
 			} else if o.Status == storage.OrderStatusDelivered {
 				statusSymbol = "🚚"
-			} else if o.Status == storage.OrderStatusCanceled {
+			} else if o.Status == storage.OrderStatusCancelled {
 				statusSymbol = "❌"
 			}
 			label := fmt.Sprintf("%s #%d | User %d | $%.2f", statusSymbol, o.ID, o.UserID, o.TotalUSD)
