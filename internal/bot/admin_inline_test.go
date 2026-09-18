@@ -1,7 +1,6 @@
 package bot
 
 import (
-	"context"
 	"testing"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -66,8 +65,6 @@ func TestAdminActionInput_CancelClearsState(t *testing.T) {
 	b := &Bot{}
 	b.adminActions.Store(int64(123), "add_category")
 
-	ctx := context.Background()
-	_ = ctx
 	msg := &tgbotapi.Message{
 		Chat: &tgbotapi.Chat{ID: 123},
 		From: &tgbotapi.User{ID: 123, LanguageCode: "en"},

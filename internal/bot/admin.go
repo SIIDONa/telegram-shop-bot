@@ -1143,7 +1143,7 @@ func (b *Bot) sendAdminMenu(chatID int64, msgID int, lang string) {
 
 func (b *Bot) sendAdminCategories(chatID int64, msgID int, lang string) {
 	ctx := context.Background()
-	categories, err := b.catalog.GetCategories(ctx)
+	categories, err := b.products.GetCategories(ctx)
 	if err != nil {
 		b.logger.Error("admin categories: list", "error", err)
 		return
@@ -1239,7 +1239,7 @@ func (b *Bot) onAdminCategoryAddPrompt(chatID, userID int64, lang string) {
 
 func (b *Bot) sendAdminProductCategories(chatID int64, msgID int, lang string) {
 	ctx := context.Background()
-	categories, err := b.catalog.GetCategories(ctx)
+	categories, err := b.products.GetCategories(ctx)
 	if err != nil {
 		b.logger.Error("admin product categories: list", "error", err)
 		return
